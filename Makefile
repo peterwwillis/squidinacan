@@ -1,4 +1,4 @@
-DOCKER_IMG          :=  squidinacan:0.1
+include ./.env
 
 docker-build:
 	docker build \
@@ -6,4 +6,4 @@ docker-build:
         .
 
 docker-run:
-	DOCKER_IMG=$(DOCKER_IMG) ./squid-in-a-can
+	./squid-in-a-can

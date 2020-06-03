@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+# Run a Squid caching proxy with Docker (as a daemon).
+# The container it's based on (chrisdaish/squid) is about 18MB
+
+
+. ./.env
+
+set -x
+docker run \
+    -d \
+    -v /etc/localtime:/etc/localtime:ro \
+    -p 3128:3128 \
+    "$DOCKER_IMG" \
+    "$@"
+
+# For an intercepting proxy:
+# 
+#   * Create a valid squid config, and pass it in the above command like this: 
+#           -v /etc/squid/squid.conf:/etc/squid/squid.conf:ro \
+# 
+#   * Add '--net=host' in the above command
+# 
+#   * Make sure your squid host has forwarding and redirect enabled:
+#           ./linux-network.sh ip-forward enable
+#           ./linux-network.sh iptables-redirect enable

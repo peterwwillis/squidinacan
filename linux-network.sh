@@ -22,6 +22,8 @@ _cmd_ip_forward () {
         enable)
             cat <<EOF | $SUDO sysctl -p -
 net.ipv4.ip_forward = 1
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.eth0.rp_filter = 0
 net.ipv4.conf.default.rp_filter = 0
 net.ipv4.conf.default.accept_source_route = 0
 EOF
@@ -29,6 +31,8 @@ EOF
         disable)
             cat <<EOF | $SUDO sysctl -p -
 net.ipv4.ip_forward = 0
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.eth0.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.conf.default.accept_source_route = 0
 EOF
