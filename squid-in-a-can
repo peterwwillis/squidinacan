@@ -2,14 +2,45 @@
 set -e
 
 # Run a Squid caching proxy with Docker (as a daemon).
-# The container it's based on (chrisdaish/squid) is about 18MB
+# The container it's based on (chrisdaish/squid) is about 18MB.
+# 
+# To customize the Squid configuration on start up, just create a
+# file 'squid.conf' or pass one via the SQUID_CONF environment variable.
+# The squid.conf.example file in this directory should work.
 
+# load .env variables
+[ -r .env ] && . ./.env
 
-. ./.env
+_usage () { printf "Usage: $0 [OPTIONS]\n\nOptions:\n\t-f FILE\t\tThe FULL path to a Squid config file\n\t-v NAME\t\tName of Docker volume for squid cache\n\t-h\t\tThis screen\n" ; exit 1 ; } ;
+
+while getopts "f:v:h" args ; do
+    case $args in
+        f)
+            SQUID_CONF_EXPR="-v $OPTARG:/etc/squid/squid.conf:ro" ;
+            shift 2 ; ;;
+        v)
+            SQUID_VOL_EXPR="-v $OPTARG:/var/cache/squid" ; shift 2 ; ;;
+        \?)
+            echo "unknown $arg - $OPTARG" ; _usage ;;
+        h|help)
+            _usage ;;
+        *)
+            echo "error: invalid arg $arg - $OPTARG" ; exit 1; ;;
+    esac
+done
+if [ $# -gt 0 ] ; then
+    echo "$0: Error: unexpected arguments"
+    _usage
+fi
 
 set -x
 docker run \
+    --rm \
     -d \
+    --hostname  "squidcache" \
+    --name      "squidcache" \
+    $SQUID_CONF_EXPR \
+    $SQUID_VOL_EXPR \
     -v /etc/localtime:/etc/localtime:ro \
     -p 3128:3128 \
     "$DOCKER_IMG" \

@@ -1,0 +1,97 @@
+#!/bin/bash
+# copy-squid-volume.sh - copy any [anonymous] Docker volumes with squid caches to a new volume
+# 
+# Set environment variable FORCE_CREATE_VOLUME=1 to skip confirmation check when a volume exists
+
+set -e
+[ -n "${DEBUG:-}" ] && set -x # set DEBUG=1 to enable tracing
+
+if [ ! `id -u` = "0" ] ; then
+    echo "$0: Error: you must be root to view docker volumes" 1>&2
+    exit 1
+fi
+
+_usage () {
+    cat <<EOUSAGE
+Usage: $0 [OPTIONS] NEW_VOLUME
+
+Options:
+  -h,--help                 This screen
+  -f,--force                Skip confirmation when new volume exists
+
+This script finds any Docker volumes which look like Squid caches, and copies them
+into a new Docker volume called NEW_VOLUME.
+EOUSAGE
+    exit 1
+}
+
+_create_vol () {
+    local name="$1"
+    local newvolid="$(docker volume ls --filter name="$name" -q)"
+    if [ -n "$newvolid" ] ; then
+        echo "$0: Warning: volume '$name' already exists ($newvolid)" 1>&2
+        if [ "${FORCE_CREATE_VOLUME:-0}" = "1" ] ; then
+            return
+        fi
+        read -p "Continue anyway? [y/N] " ANSWER
+        if [ ! "$ANSWER" = "y" -a ! "$ANSWER" = "Y" ] ; then
+            echo "$0: Bailing out" 1>&2
+            exit 1
+        fi
+    else
+        docker volume create --label name="$name" --label type="squidcache" "$name"
+    fi
+}
+
+_find_squid_vol () {
+    local newvolname="$1"
+    local volids=""
+    local newvolid="$(docker volume ls --filter name="$newvolname" -q)"
+    echo "$0: Info: Looking for Docker volumes with Squid caches..." 1>&2
+    while read -r dvolid ; do
+        mpoint=$(docker inspect "$dvolid" --format "{{.Mountpoint}}")
+        # squid keeps a 'swap.state' for its default cache storage method
+        if [ -e "$mpoint/swap.state" ] ; then 
+            # Skip the 'new' volume if it already existed
+            [ "$dvolid" = "$newvolid" ] && continue 
+            volids="$(printf "%s\t%s" "$volids" "$dvolid")"
+        fi
+    done < <(docker volume ls -q) # read from a pipe in a while loop in current shell session
+    printf "$volids\n"
+}
+
+_copy_vol () {
+    local oldvol="$1"
+    local newvol="$2"
+    # I don't know a simpler/less resource-inefficient way to do this :(
+    # Requires downloading Busybox container, ~750KB
+    echo "$0: Copying Docker volume '$oldvol' into '$newvol' ..." 1>&2
+    docker run --rm -v "$oldvol:/oldvol" -v "$newvol:/newvol" busybox sh -c "cd /newvol && cp -a /oldvol/* ."
+}
+
+_copy_squid_vols () {
+    local newvolname="$1"
+    local squid_vol_ids="$(_find_squid_vol "$newvolname")"
+    if [ -n "$squid_vol_ids" ] ; then
+        _create_vol "$newvolname"
+
+        for volid in $squid_vol_ids ; do
+            _copy_vol "$volid" "$newvolname"
+        done
+    else
+        echo "$0: Error: could not find any squid volumes to copy" 1>&2
+        exit 1
+    fi
+}
+
+[ $# -lt 1 -o "$1" = "-h" -o "$1" = "--help" ] && _usage
+
+if [ "$1" = "-f" -o "$1" = "--force" ] ; then
+    FORCE_CREATE_VOLUME=1
+    shift
+fi
+
+NEWVOLNAME="$1"
+_copy_squid_vols "$NEWVOLNAME"
+exit $?
+

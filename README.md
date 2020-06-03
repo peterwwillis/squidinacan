@@ -3,13 +3,6 @@
 
 The default configuration has enough for you to start using it immediately, **but no security is assumed at all! DO NOT RUN THIS ON A PUBLIC NETWORK!**
 
-By default the container will create persistent Docker volumes for '/var/cache/squid' and '/var/log/squid'. You can map in your own volumes on top of them at run time. See below for configuration details.
-
-The following ports are configured for Squid to listen on:
- - 3128: a regular Squid proxy listener (most commonly used)
- - 3129: an intercept listener
- - 3130: a transparent listener
- - 3131: a tproxy listener
 
 # Requirements
  - Docker
@@ -27,9 +20,25 @@ The following ports are configured for Squid to listen on:
    $ http_proxy=http://localhost:3128 curl -v -I http://www.google.com/
    ```
 
-# Configuration
+# More Details
+
+## Data Volumes
+By default the container will create a persistent *anonymous* Docker volume for `/var/cache/squid` and `/var/log/squid`. Because it is an anonymous volume, the next time you run the container, it won't find the old volume, so your cache will appear to be gone.
+
+However, there should still be a volume with a very long name sitting on your disk with the old cache. You can recover the cache by finding the volume, creating a new volume, and copying the contents from the old one to the new one. If the new one is 'named' (non an anonymous volume), it should persist between container runs. Use the script [copy-squid-docker-volume](,/copy-squid-docker-volume) to automate this.
+
+To preserve your Squid cache between runs, use a 'named' volume for `/var/cache/squid` each time (ex: `docker run --rm -v squidcache:/var/cache/squid -p 3128:3128 peterwwillis/squidinacan`)
+
+## Open Ports
+The following ports are configured for Squid to listen on:
+ - 3128: a regular Squid proxy listener (most commonly used)
+ - 3129: an intercept listener
+ - 3130: a transparent listener
+ - 3131: a tproxy listener
+
+# Squid Configuration
 You can change the configuration of the running Squid in two ways:
- 1. Create a new `squid.conf` file and volume-mount it into the container at `/etc/squid/squid.conf`
+ 1. Create a new `squid.conf` file and volume-mount it into the container at `/etc/squid/squid.conf`. (This is done automatically if the [squid-in-a-can](./squid-in-a-can) script finds a `squid.conf` file in the current directory)
  2. Pass new build arguments at `docker build` time.
     - `--build-arg DISK_CACHE_SIZE=5000`
       - This specifies the size of the Squid disk cache in megabytes.
@@ -40,6 +49,12 @@ You can change the configuration of the running Squid in two ways:
 All contents of this repository is released to the public domain.
 
 This repository's contents and subsequent Docker containers come with no warranty whatsoever. You break it, you buy it.
+
+# FAQ
+ - **Q: Why am I getting the error 'docker: Error response from daemon: source is not directory.' ?**
+   - **A:** You specified the `-f` option to [squid-in-a-can](./squid-in-a-can) without a fully-qualified path.
+ - **Q: Why am I getting the error 'The container name "/squidcache" is already in use' ?**
+   - **A:** You need to remove your old containers with the same name. Run `docker rm squidcache` or `docker container prune`.
 
 # Tips
  - You may want to set the following environment variables for any commands you want to proxy:
