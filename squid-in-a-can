@@ -11,7 +11,7 @@ set -e
 # load .env variables
 [ -r .env ] && . ./.env
 
-_usage () { printf "Usage: $0 [OPTIONS]\n\nOptions:\n\t-f FILE\t\tThe FULL path to a Squid config file\n\t-v NAME\t\tName of Docker volume for squid cache\n\t-h\t\tThis screen\n" ; exit 1 ; } ;
+_usage () { printf "Usage: $0 [OPTIONS]\n\nThis script runs a Squid proxy in a background Docker container.\n\nOptions:\n\t-f FILE\t\tThe FULL path to a Squid config file\n\t-v NAME\t\tName of a persistent Docker volume for the squid cache\n\t-h\t\tThis screen\n" ; exit 1 ; } ;
 
 while getopts "f:v:h" args ; do
     case $args in

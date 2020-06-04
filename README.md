@@ -10,11 +10,19 @@ The default configuration has enough for you to start using it immediately, **bu
  - Make
 
 # Usage
- - Build and run the container:
+ - Build the container:
    ```bash
    $ docker build -t peterwwillis/squidinacan:0.1 .
-   $ docker run -p 3128:3128 peterwwillis/squidinacan:0.1
    ```
+ - Run the container:
+   - Simple method:
+     ```bash
+     $ docker run -p 3128:3128 peterwwillis/squidinacan:0.1
+     ```
+   - Fancy wrapper method (backgrounds container; use `-h` option for details):
+     ```bash
+     $ ./squid-in-a-can -v squidcache
+     ```
  - Run a command using the new proxy:
    ```bash
    $ http_proxy=http://localhost:3128 curl -v -I http://www.google.com/
@@ -25,7 +33,7 @@ The default configuration has enough for you to start using it immediately, **bu
 ## Data Volumes
 By default the container will create a persistent *anonymous* Docker volume for `/var/cache/squid` and `/var/log/squid`. Because it is an anonymous volume, the next time you run the container, it won't find the old volume, so your cache will appear to be gone.
 
-However, there should still be a volume with a very long name sitting on your disk with the old cache. You can recover the cache by finding the volume, creating a new volume, and copying the contents from the old one to the new one. If the new one is 'named' (non an anonymous volume), it should persist between container runs. Use the script [copy-squid-docker-volume](,/copy-squid-docker-volume) to automate this.
+However, there should still be a volume with a very long name sitting on your disk with the old cache. You can recover the cache by finding the volume, creating a new volume, and copying the contents from the old one to the new one. If the new one is 'named' (non an anonymous volume), it should persist between container runs. Use the script [copy-squid-docker-volume](./copy-squid-docker-volume) to automate this.
 
 To preserve your Squid cache between runs, use a 'named' volume for `/var/cache/squid` each time (ex: `docker run --rm -v squidcache:/var/cache/squid -p 3128:3128 peterwwillis/squidinacan`)
 
@@ -36,7 +44,7 @@ The following ports are configured for Squid to listen on:
  - 3130: a transparent listener
  - 3131: a tproxy listener
 
-# Squid Configuration
+## Squid Configuration
 You can change the configuration of the running Squid in two ways:
  1. Create a new `squid.conf` file and volume-mount it into the container at `/etc/squid/squid.conf`. (This is done automatically if the [squid-in-a-can](./squid-in-a-can) script finds a `squid.conf` file in the current directory)
  2. Pass new build arguments at `docker build` time.
@@ -55,6 +63,12 @@ This repository's contents and subsequent Docker containers come with no warrant
    - **A:** You specified the `-f` option to [squid-in-a-can](./squid-in-a-can) without a fully-qualified path.
  - **Q: Why am I getting the error 'The container name "/squidcache" is already in use' ?**
    - **A:** You need to remove your old containers with the same name. Run `docker rm squidcache` or `docker container prune`.
+ - **Q: Why aren't some files getting cached?**
+   - **A:** Usually this is because an application either doesn't take an `http_proxy` option, or it is downloading through HTTPS. The workaround is to install a custom CA certificate into your OS or application (some applications don't use the OS's certificate store, like PIP and AWS CLI), and then install it into Squid, and configure Squid to basically terminate and re-initiate connections as a Man-in-the-Middle.
+   
+     An alternative may exist for your application. Some applications take an option to specify a custom source for downloads, like a custom download repository. Provide your app an HTTP download source (assuming it also accepts an `http_proxy` option) and your downloads will probably cache correctly.
+ - **Q: Can I intercept all traffic without needing to specify an `http_proxy=` option to applications?**
+   - **A:** Yes, but apparently it's much more complicated now than it used to be, and I still haven't gotten it to work...
 
 # Tips
  - You may want to set the following environment variables for any commands you want to proxy:
