@@ -21,7 +21,7 @@ The default configuration has enough for you to start using it immediately, **bu
      ```
    - Fancy wrapper method (backgrounds container; use `-h` option for details):
      ```bash
-     $ ./squid-in-a-can -v squidcache
+     $ ./squid-in-a-can -c squidcache
      ```
  - Run a command using the new proxy:
    ```bash
@@ -52,6 +52,34 @@ You can change the configuration of the running Squid in two ways:
       - This specifies the size of the Squid disk cache in megabytes.
     - `--build-arg MAX_CACHE_OBJECT=1000`
       - This specifies the max number of objects Squid should cache.
+
+## Caching HTTPS content
+The default squid configuration will not cache any HTTPS content going through the proxy (which is a lot of it these days!). To cache TLS content, do the following:
+
+1. Generate the certificates and keys needed
+   ```bash
+   $ cd certs/
+   $ ./cert.sh generate
+   ```
+2. Install the new CA certificate in your client machine's certificate chain, so your client apps will accept content from them. (You'll probably need to find steps that work for your specific OS and client apps)
+   ```bash
+   $ cd certs/
+   $ sudo ./cert.sh install
+   ```
+3. Run Squid, passing in the TLS configuration file, your cache volume, your certs directory, and the ssl DB cache. (This script opens both ports 3128 and 3132)
+   ```bash
+   ./squid-in-a-can \
+        -f `pwd`/squid.conf.example_tls \
+        -c squidproxycache \
+        -C `pwd`/certs \
+        -s `pwd`/ssl_db
+   ```
+4. Configure your HTTPS clients to send their proxy requests to port 3132 instead of 3128.
+   ```bash
+   $ export http_proxy=http://localhost:3128
+   $ export https_proxy=https://localhost:3132
+   ```
+
 
 # License
 All contents of this repository is released to the public domain.
@@ -84,16 +112,20 @@ This repository's contents and subsequent Docker containers come with no warrant
    
    You can pass those variables to `docker run` as `--env` arguments to set them when running a container.
 
- - If you use this for a Docker container (build or runtime), you probably want the proxy IP or hostname to be an address that your container can route to (so: not 'localhost')
-
+ - To connect to the proxy from another Docker container:
+   
+    - If the Squid Container has exposed port 3128 on the Docker host,
+    - and the Docker host's IP is 192.168.88.10,
+    - configure the Client Container to connect to the proxy on 192.168.88.10:3128 .
+   
  - To view the cache and log volumes auto-created by the container:
    ```bash
-   $ docker inspect -f '{{ json .Mounts }}' $(docker ps -q) | jq
+   $ docker inspect -f '{{ json .Mounts }}' $(docker ps -f name=squidcache -q) | jq
    ```
 
  - To display all the cache files sorted by size:
    ```bash
-   $ docker inspect -f '{{ json .Mounts }}' $(docker ps -q) \
+   $ docker inspect -f '{{ json .Mounts }}' $(docker ps -f name=squidcache -q) \
         | jq -r '.[].Source' \
         | grep -v null \
         | sudo /bin/sh -c \

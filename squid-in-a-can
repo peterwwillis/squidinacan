@@ -11,21 +11,37 @@ set -e
 # load .env variables
 [ -r .env ] && . ./.env
 
-_usage () { printf "Usage: $0 [OPTIONS]\n\nThis script runs a Squid proxy in a background Docker container.\n\nOptions:\n\t-f FILE\t\tThe FULL path to a Squid config file\n\t-v NAME\t\tName of a persistent Docker volume for the squid cache\n\t-h\t\tThis screen\n" ; exit 1 ; } ;
+_usage () {
+    printf "Usage: $0 [OPTIONS]
 
-while getopts "f:v:h" args ; do
+This script runs a Squid proxy in a background Docker container.
+
+Options:
+    -f FILE             The FULL path to a Squid config file
+    -c NAME             Name of a persistent Docker volume for the squid cache
+    -C DIR              The path to the certs/ directory to volume-map in
+    -s NAME             Name of a persistent Docker volume for the SSL cert database
+    -h                  This screen
+"
+    exit 1
+}
+
+while getopts "f:c:C:s:h" args ; do
     case $args in
         f)
-            SQUID_CONF_EXPR="-v $OPTARG:/etc/squid/squid.conf:ro" ;
-            shift 2 ; ;;
-        v)
-            SQUID_VOL_EXPR="-v $OPTARG:/var/cache/squid" ; shift 2 ; ;;
+            SQUID_CONF="-v $OPTARG:/etc/squid/squid.conf:ro"; shift 2 ;;
+        c)
+            SQUID_VOL="-v $OPTARG:/var/cache/squid"; shift 2 ;;
+        C)
+            SQUID_CERT="-v $OPTARG:/etc/squid/certs"; shift 2 ;;
+        s)
+            SQUID_SSLDB="-v $OPTARG:/var/lib/ssl_db"; shift 2 ;;
         \?)
             echo "unknown $arg - $OPTARG" ; _usage ;;
         h|help)
             _usage ;;
         *)
-            echo "error: invalid arg $arg - $OPTARG" ; exit 1; ;;
+            echo "error: invalid arg $arg - $OPTARG" ; exit 1 ;;
     esac
 done
 if [ $# -gt 0 ] ; then
@@ -39,10 +55,12 @@ docker run \
     -d \
     --hostname  "squidcache" \
     --name      "squidcache" \
-    $SQUID_CONF_EXPR \
-    $SQUID_VOL_EXPR \
+    $SQUID_CONF \
+    $SQUID_VOL \
+    $SQUID_CERT \
     -v /etc/localtime:/etc/localtime:ro \
     -p 3128:3128 \
+    -p 3132:3132 \
     "$DOCKER_IMG" \
     "$@"
 
